@@ -1,16 +1,15 @@
 
-## to setup and run
+## To setup and run:
 setupAndRun.sh
-<br>
+
 <br>
 
-### Power consumption while running metalshaders
+### Power consumption while running metalshaders: sudo powermetrics --samplers cpu_power,gpu_power -i 1000
 ![power consumption while running metalshaders code](whileRunning.png)
 
 <br>
-<br>
 
-### Idle power consumption
+### Idle power consumption:
 ![power consumption while running metalshaders code](idle.png)
 
 
