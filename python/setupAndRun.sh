@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ── 1. Clone and build TPC-H dbgen ──────────────────────────────────────────
-if [ ! -d "tpch-dbgen" ]; then
+if [ ! -d "../common/tpch-dbgen" ]; then
     git clone https://github.com/electrum/tpch-dbgen
     cd tpch-dbgen
 

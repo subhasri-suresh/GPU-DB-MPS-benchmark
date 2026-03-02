@@ -1,0 +1,5 @@
+Device: Apple M1
+Rows: 1500000
+CPU sum: 226815639552.00
+GPU sum: 226829303808.00
+Rel error: 0.000060

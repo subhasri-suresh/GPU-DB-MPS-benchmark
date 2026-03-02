@@ -1,11 +1,12 @@
-CC      = clang
+CC      = xcrun clang
 CFLAGS  = -fobjc-arc \
            -framework Foundation \
            -framework Metal \
            -framework MetalPerformanceShaders \
+           -framework MetalPerformanceShadersGraph \
            -lc++
 
-TARGET  = MetalVectorSum
+TARGET  = MPSSumUsingGraph
 SRC     = main.mm
 
 .PHONY: all run clean

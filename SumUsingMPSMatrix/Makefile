@@ -5,7 +5,7 @@ CFLAGS  = -fobjc-arc \
            -framework MetalPerformanceShaders \
            -lc++
 
-TARGET  = MetalVectorSum
+TARGET  = MPSSumUsingMatrix
 SRC     = main.mm
 
 .PHONY: all run clean

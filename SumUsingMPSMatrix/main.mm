@@ -2,13 +2,8 @@
  * MetalVectorSum - TPC-H o_totalprice Sum
  *
  * Reads o_totalprice from TPC-H orders.tbl and computes the sum
- * using Metal Performance Shaders, matching the Python/PyTorch implementation.
+ * using Metal Performance Shaders, using matrix
  *
- * Strategy:
- *   Treat the input vector as a 1×N matrix (A).
- *   Create an N×1 matrix of ones (B).
- *   Use MPSMatrixMultiplication to compute C = A × B.
- *   C is a 1×1 matrix whose single element equals sum(A).
  */
 
 #import <Foundation/Foundation.h>
@@ -18,9 +13,7 @@
 int main(int argc, const char *argv[]) {
     @autoreleasepool {
 
-        // ------------------------------------------------------------------ //
         // 1. Metal device + command queue
-        // ------------------------------------------------------------------ //
         id<MTLDevice> device = MTLCreateSystemDefaultDevice();
         if (!device) {
             NSLog(@"[ERROR] Metal is not supported on this device.");
@@ -30,11 +23,7 @@ int main(int argc, const char *argv[]) {
 
         id<MTLCommandQueue> commandQueue = [device newCommandQueue];
 
-        // ------------------------------------------------------------------ //
         // 2. Load o_totalprice from TPC-H orders.tbl
-        //    Format: o_orderkey|o_custkey|o_orderstatus|o_totalprice|...
-        //    o_totalprice is field index 3 (pipe-separated)
-        // ------------------------------------------------------------------ //
         NSString *filePath = @"../common/tpch-dbgen/orders.tbl";
         NSError *error = nil;
         NSString *content = [NSString stringWithContentsOfFile:filePath
@@ -139,7 +128,7 @@ int main(int argc, const char *argv[]) {
         [cmdBuf waitUntilCompleted];
 
         // ------------------------------------------------------------------ //
-        // 8. Read result and verify (0.1% relative tolerance for float32)
+        // 8. Read result 
         // ------------------------------------------------------------------ //
         float gpuSum = *((float *)outputBuf.contents);
         float relErr = fabsf(gpuSum - cpuSum) / fabsf(cpuSum);
@@ -151,6 +140,25 @@ int main(int argc, const char *argv[]) {
         } else {
             NSLog(@"[FAIL]  Mismatch! GPU=%.2f  CPU=%.2f  (rel err: %.6f)", gpuSum, cpuSum, relErr);
             return EXIT_FAILURE;
+        }
+
+        // ------------------------------------------------------------------ //
+        // 9. Write results to file
+        // ------------------------------------------------------------------ //
+        NSString *result = [NSString stringWithFormat:
+            @"Device: %@\nRows: %lu\nCPU sum: %.2f\nGPU sum: %.2f\nRel error: %.6f\n",
+            device.name, (unsigned long)N, cpuSum, gpuSum, relErr];
+
+        NSError *writeError = nil;
+        [result writeToFile:@"output.txt"
+                 atomically:YES
+                   encoding:NSUTF8StringEncoding
+                      error:&writeError];
+
+        if (writeError) {
+            NSLog(@"[ERROR] Failed to write output: %@", writeError.localizedDescription);
+        } else {
+            NSLog(@"[INFO]  Results written to output.txt");
         }
     }
     return EXIT_SUCCESS;

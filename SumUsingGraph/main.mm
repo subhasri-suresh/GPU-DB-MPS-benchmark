@@ -112,6 +112,25 @@ int main(int argc, const char *argv[]) {
             NSLog(@"[FAIL]  Mismatch! GPU=%.2f  CPU=%.2f  (rel err: %.6f)", gpuSum, cpuSum, relErr);
             return EXIT_FAILURE;
         }
+
+        // ------------------------------------------------------------------ //
+        // 7. Write results to file
+        // ------------------------------------------------------------------ //
+        NSString *result = [NSString stringWithFormat:
+            @"Device: %@\nRows: %lu\nCPU sum: %.2f\nGPU sum: %.2f\nRel error: %.6f\n",
+            device.name, (unsigned long)N, cpuSum, gpuSum, relErr];
+
+        NSError *writeError = nil;
+        [result writeToFile:@"output.txt"
+                 atomically:YES
+                   encoding:NSUTF8StringEncoding
+                      error:&writeError];
+
+        if (writeError) {
+            NSLog(@"[ERROR] Failed to write output: %@", writeError.localizedDescription);
+        } else {
+            NSLog(@"[INFO]  Results written to output.txt");
+        }
     }
     return EXIT_SUCCESS;
 }

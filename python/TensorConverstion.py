@@ -2,7 +2,7 @@ import pandas as pd
 import torch
 
 df = pd.read_csv(
-    "tpch-dbgen/orders.tbl",
+    "../common/tpch-dbgen/orders.tbl",
     sep="|",
     header=None,
     names=["o_orderkey","o_custkey","o_orderstatus","o_totalprice",
