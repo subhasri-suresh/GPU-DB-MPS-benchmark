@@ -8,13 +8,6 @@
 | `NeuralNetworkWithMPS/` | Neural network inference with MPS |
 | `python/` | Python baseline / tensor conversion utilities |
 
-## Setup & Run
-
-```bash
-./setupAndRun.sh
-```
-
-Each project also has its own `run.sh` and `Makefile`.
 
 ## Output Files
 
