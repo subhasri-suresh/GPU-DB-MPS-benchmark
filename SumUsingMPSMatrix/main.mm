@@ -9,6 +9,13 @@
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
+#include <time.h>
+
+static double msNow(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+    return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
+}
 
 int main(int argc, const char *argv[]) {
     @autoreleasepool {
@@ -38,6 +45,7 @@ int main(int argc, const char *argv[]) {
         NSMutableData *priceData = [NSMutableData data];
         float cpuSum = 0.0f;
 
+        double cpuStart = msNow();
         for (NSString *line in lines) {
             if (line.length == 0) continue;
             NSArray<NSString *> *fields = [line componentsSeparatedByString:@"|"];
@@ -47,6 +55,7 @@ int main(int argc, const char *argv[]) {
                 [priceData appendBytes:&price length:sizeof(float)];
             }
         }
+        double cpuMs = msNow() - cpuStart;
 
         NSUInteger N = priceData.length / sizeof(float);
         NSUInteger floatSize = sizeof(float);
@@ -54,9 +63,6 @@ int main(int argc, const char *argv[]) {
         NSLog(@"[INFO]  Rows   : %lu", (unsigned long)N);
         NSLog(@"[INFO]  CPU sum: %.2f  (expected)", cpuSum);
 
-        // ------------------------------------------------------------------ //
-        // 3. Metal buffers
-        // ------------------------------------------------------------------ //
         id<MTLBuffer> inputBuf =
             [device newBufferWithBytes:priceData.bytes
                                 length:priceData.length
@@ -73,7 +79,7 @@ int main(int argc, const char *argv[]) {
                                 options:MTLResourceStorageModeShared];
 
         // ------------------------------------------------------------------ //
-        // 4. MPS matrix descriptors
+        // MPS matrix descriptors
         //      A : 1 × N   rowBytes = N * sizeof(float)
         //      B : N × 1   rowBytes =     sizeof(float)
         //      C : 1 × 1   rowBytes =     sizeof(float)
@@ -96,16 +102,12 @@ int main(int argc, const char *argv[]) {
                                                  rowBytes:floatSize
                                                  dataType:MPSDataTypeFloat32];
 
-        // ------------------------------------------------------------------ //
-        // 5. MPS matrix wrappers
-        // ------------------------------------------------------------------ //
+
         MPSMatrix *matA = [[MPSMatrix alloc] initWithBuffer:inputBuf  descriptor:descA];
         MPSMatrix *matB = [[MPSMatrix alloc] initWithBuffer:onesBuf   descriptor:descB];
         MPSMatrix *matC = [[MPSMatrix alloc] initWithBuffer:outputBuf descriptor:descC];
 
-        // ------------------------------------------------------------------ //
-        // 6. MPSMatrixMultiplication kernel  C = 1.0 * A × B + 0.0 * C
-        // ------------------------------------------------------------------ //
+        // MPSMatrixMultiplication kernel  C = 1.0 * A × B + 0.0 * C
         MPSMatrixMultiplication *matMul =
             [[MPSMatrixMultiplication alloc] initWithDevice:device
                                               transposeLeft:NO
@@ -116,9 +118,8 @@ int main(int argc, const char *argv[]) {
                                                      alpha:1.0
                                                       beta:0.0];
 
-        // ------------------------------------------------------------------ //
-        // 7. Encode and commit to the GPU
-        // ------------------------------------------------------------------ //
+        //  Encode and commit to the GPU
+        double gpuStart = msNow();
         id<MTLCommandBuffer> cmdBuf = [commandQueue commandBuffer];
         [matMul encodeToCommandBuffer:cmdBuf
                            leftMatrix:matA
@@ -126,14 +127,14 @@ int main(int argc, const char *argv[]) {
                         resultMatrix:matC];
         [cmdBuf commit];
         [cmdBuf waitUntilCompleted];
+        double gpuMs = msNow() - gpuStart;
 
-        // ------------------------------------------------------------------ //
-        // 8. Read result 
-        // ------------------------------------------------------------------ //
         float gpuSum = *((float *)outputBuf.contents);
         float relErr = fabsf(gpuSum - cpuSum) / fabsf(cpuSum);
 
         NSLog(@"[INFO]  GPU sum: %.2f  (MPS computed)", gpuSum);
+        NSLog(@"[INFO]  CPU time: %.3f ms", cpuMs);
+        NSLog(@"[INFO]  GPU time: %.3f ms", gpuMs);
 
         if (relErr < 1e-3f) {
             NSLog(@"[PASS]  GPU sum matches CPU sum (rel err: %.6f)", relErr);
@@ -142,12 +143,10 @@ int main(int argc, const char *argv[]) {
             return EXIT_FAILURE;
         }
 
-        // ------------------------------------------------------------------ //
         // 9. Write results to file
-        // ------------------------------------------------------------------ //
         NSString *result = [NSString stringWithFormat:
-            @"Device: %@\nRows: %lu\nCPU sum: %.2f\nGPU sum: %.2f\nRel error: %.6f\n",
-            device.name, (unsigned long)N, cpuSum, gpuSum, relErr];
+            @"Device: %@\nRows: %lu\nCPU sum: %.2f\nGPU sum: %.2f\nRel error: %.6f\nCPU time: %.3f ms\nGPU time: %.3f ms\n",
+            device.name, (unsigned long)N, cpuSum, gpuSum, relErr, cpuMs, gpuMs];
 
         NSError *writeError = nil;
         [result writeToFile:@"output.txt"

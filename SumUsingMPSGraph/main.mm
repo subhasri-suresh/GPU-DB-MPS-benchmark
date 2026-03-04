@@ -13,6 +13,13 @@
 #import <Metal/Metal.h>
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
 #import <MetalPerformanceShadersGraph/MetalPerformanceShadersGraph.h>
+#include <time.h>
+
+static double msNow(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+    return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
+}
 
 int main(int argc, const char *argv[]) {
     @autoreleasepool {
@@ -47,6 +54,7 @@ int main(int argc, const char *argv[]) {
         NSMutableData *priceData = [NSMutableData data];
         float cpuSum = 0.0f;
 
+        double cpuStart = msNow();
         for (NSString *line in lines) {
             if (line.length == 0) continue;
             NSArray<NSString *> *fields = [line componentsSeparatedByString:@"|"];
@@ -56,6 +64,7 @@ int main(int argc, const char *argv[]) {
                 [priceData appendBytes:&price length:sizeof(float)];
             }
         }
+        double cpuMs = msNow() - cpuStart;
 
         NSUInteger N = priceData.length / sizeof(float);
         NSLog(@"[INFO]  Rows   : %lu", (unsigned long)N);
@@ -92,6 +101,7 @@ int main(int argc, const char *argv[]) {
         // ------------------------------------------------------------------ //
         // 5. Run the graph
         // ------------------------------------------------------------------ //
+        double gpuStart = msNow();
         NSDictionary<MPSGraphTensor *, MPSGraphTensorData *> *results =
             [graph runWithFeeds:@{inputTensor: inputTensorData}
                   targetTensors:@[sumTensor]
@@ -102,9 +112,12 @@ int main(int argc, const char *argv[]) {
         // ------------------------------------------------------------------ //
         float gpuSum = 0.0f;
         [results[sumTensor].mpsndarray readBytes:&gpuSum strideBytes:nil];
+        double gpuMs = msNow() - gpuStart;
 
         float relErr = fabsf(gpuSum - cpuSum) / fabsf(cpuSum);
         NSLog(@"[INFO]  GPU sum: %.2f  (MPSGraph computed)", gpuSum);
+        NSLog(@"[INFO]  CPU time: %.3f ms", cpuMs);
+        NSLog(@"[INFO]  GPU time: %.3f ms", gpuMs);
 
         if (relErr < 1e-3f) {
             NSLog(@"[PASS]  GPU sum matches CPU sum (rel err: %.6f)", relErr);
@@ -117,8 +130,8 @@ int main(int argc, const char *argv[]) {
         // 7. Write results to file
         // ------------------------------------------------------------------ //
         NSString *result = [NSString stringWithFormat:
-            @"Device: %@\nRows: %lu\nCPU sum: %.2f\nGPU sum: %.2f\nRel error: %.6f\n",
-            device.name, (unsigned long)N, cpuSum, gpuSum, relErr];
+            @"Device: %@\nRows: %lu\nCPU sum: %.2f\nGPU sum: %.2f\nRel error: %.6f\nCPU time: %.3f ms\nGPU time: %.3f ms\n",
+            device.name, (unsigned long)N, cpuSum, gpuSum, relErr, cpuMs, gpuMs];
 
         NSError *writeError = nil;
         [result writeToFile:@"output.txt"

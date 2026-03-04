@@ -4,7 +4,7 @@ OUTPUT_FILE="power_log.txt"
 
 echo "Timestamp, CPU Power (mW), GPU Power (mW), ANE Power (mW), Combined Power (mW)" > "$OUTPUT_FILE"
 
-sudo powermetrics --samplers cpu_power,gpu_power,ane_power -i 250 -n 30 | while IFS= read -r line; do
+sudo powermetrics --samplers cpu_power,gpu_power,ane_power -i 250 -n 60 | while IFS= read -r line; do
     if [[ "$line" =~ ^CPU\ Power:\ ([0-9]+)\ mW ]]; then
         cpu="${BASH_REMATCH[1]}"
     elif [[ "$line" =~ ^GPU\ Power:\ ([0-9]+)\ mW ]]; then
