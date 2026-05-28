@@ -1,0 +1,4 @@
+build/
+GPUDBMPSBenchmark
+data/**/*.tbl
+.DS_Store
