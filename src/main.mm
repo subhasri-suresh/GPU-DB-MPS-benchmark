@@ -2,10 +2,13 @@
 #import <Foundation/Foundation.h>
 
 void runMicrobenchmarks(id<MTLDevice> device, id<MTLCommandQueue> queue);
-void runQ6(id<MTLDevice> device, id<MTLCommandQueue> queue);
-void runQ14(id<MTLDevice> device, id<MTLCommandQueue> queue);
 void runQ1(id<MTLDevice> device, id<MTLCommandQueue> queue);
+void runQ3(id<MTLDevice> device, id<MTLCommandQueue> queue);
+void runQ5(id<MTLDevice> device, id<MTLCommandQueue> queue);
+void runQ6(id<MTLDevice> device, id<MTLCommandQueue> queue);
+void runQ9(id<MTLDevice> device, id<MTLCommandQueue> queue);
 void runQ12(id<MTLDevice> device, id<MTLCommandQueue> queue);
+void runQ14(id<MTLDevice> device, id<MTLCommandQueue> queue);
 
 static void showHelp() {
     printf("GPU Database MPS Benchmark\n");
@@ -14,10 +17,12 @@ static void showHelp() {
     printf("  all           - Run all benchmarks (default)\n");
     printf("  micro         - Micro-benchmarks (selection, aggregation, join)\n");
     printf("  q1            - TPC-H Q1  (Pricing Summary)\n");
-    printf("  q3            - TPC-H Q3  (Shipping Priority)\n");
+    printf("  q3            - TPC-H Q3  (Shipping Priority)      [3-way join]\n");
+    printf("  q5            - TPC-H Q5  (Local Supplier Volume)  [5-way join]\n");
     printf("  q6            - TPC-H Q6  (Forecasting Revenue Change)\n");
+    printf("  q9            - TPC-H Q9  (Product Type Profit)    [6-table join]\n");
     printf("  q12           - TPC-H Q12 (Shipping Modes)\n");
-    printf("  q14           - TPC-H Q14 (Promotion Effect)  [scatter-free, two sums]\n");
+    printf("  q14           - TPC-H Q14 (Promotion Effect)\n");
     printf("  help          - Show this help message\n\n");
     printf("Scale Factors:\n");
     printf("  sf1           - TPC-H SF-1  (~6M lineitem rows)\n");
@@ -59,14 +64,20 @@ int main(int argc, const char* argv[]) {
 
         if (query == "micro" || query == "all")
             runMicrobenchmarks(device, commandQueue);
-        if (query == "q6" || query == "all")
-            runQ6(device, commandQueue);
-        if (query == "q14" || query == "all")
-            runQ14(device, commandQueue);
         if (query == "q1" || query == "all")
             runQ1(device, commandQueue);
+        if (query == "q3" || query == "all")
+            runQ3(device, commandQueue);
+        if (query == "q5" || query == "all")
+            runQ5(device, commandQueue);
+        if (query == "q6" || query == "all")
+            runQ6(device, commandQueue);
+        if (query == "q9" || query == "all")
+            runQ9(device, commandQueue);
         if (query == "q12" || query == "all")
             runQ12(device, commandQueue);
+        if (query == "q14" || query == "all")
+            runQ14(device, commandQueue);
     }
     return 0;
 }

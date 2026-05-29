@@ -4,14 +4,14 @@ import matplotlib.ticker as ticker
 import numpy as np
 
 # ── Load data ─────────────────────────────────────────────────────────────────
-metal_csv = "GPUDBMetalBenchmark/results/gpu_results.csv"
-mps_csv   = "GPUDBMPSBenchmark/results/mps_results.csv"
+metal_csv = "results/metal_results.csv"
+mps_csv   = "results/mps_results.csv"
 
 metal_df = pd.read_csv(metal_csv)
 mps_df   = pd.read_csv(mps_csv)
 
 # ── Filter: latest run on Apple M1, only queries present in both ──────────────
-QUERIES = ["Q1", "Q6", "Q12", "Q14"]
+QUERIES = ["Q1", "Q3", "Q5", "Q6", "Q9", "Q12", "Q14"]
 SFS     = ["SF-1", "SF-10"]
 
 metal_m1 = metal_df[metal_df["gpu_name"] == "Apple M1"]
@@ -48,16 +48,16 @@ rows = [f"{r.scale_factor:<8} {r.query:<6} {r.metal_ms:>12.2f} {r.mps_ms:>12.2f}
 table_txt = "\n".join([header, divider] + rows)
 print(table_txt)
 
-with open("comparison_table.txt", "w") as f:
+with open("results/comparison_table.txt", "w") as f:
     f.write("Plain Metal vs MPSGraph — TPC-H on Apple M1\n")
     f.write("=" * 52 + "\n")
     f.write(table_txt + "\n")
 
 df.rename(columns={"metal_ms": "metal_gpu_ms", "mps_ms": "mps_gpu_ms"}) \
-  .to_csv("comparison_table.csv", index=False)
+  .to_csv("results/comparison_table.csv", index=False)
 
-print("\nTable saved → comparison_table.txt")
-print("Table saved → comparison_table.csv")
+print("\nTable saved → results/comparison_table.txt")
+print("Table saved → results/comparison_table.csv")
 
 # ── Plot ──────────────────────────────────────────────────────────────────────
 fig, axes = plt.subplots(1, 2, figsize=(13, 5), sharey=False)
@@ -89,7 +89,7 @@ for ax, sf in zip(axes, SFS):
     ax.set_axisbelow(True)
 
 plt.tight_layout()
-out = "comparison_metal_vs_mps.png"
+out = "results/comparison_metal_vs_mps.png"
 plt.savefig(out, dpi=150, bbox_inches="tight")
 print(f"\nChart saved → {out}")
 plt.show()
