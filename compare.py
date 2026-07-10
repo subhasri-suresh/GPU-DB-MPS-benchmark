@@ -11,7 +11,7 @@ metal_df = pd.read_csv(metal_csv)
 mps_df   = pd.read_csv(mps_csv)
 
 # ── Filter: latest run on Apple M1, only queries present in both ──────────────
-QUERIES = ["Q1", "Q3", "Q5", "Q6", "Q9", "Q12", "Q14"]
+QUERIES = ["Q1", "Q3", "Q4", "Q5", "Q6", "Q9", "Q12", "Q14"]
 SFS     = ["SF-1", "SF-10"]
 
 metal_m1 = metal_df[metal_df["gpu_name"] == "Apple M1"]

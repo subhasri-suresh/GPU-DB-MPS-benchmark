@@ -4,6 +4,7 @@
 void runMicrobenchmarks(id<MTLDevice> device, id<MTLCommandQueue> queue);
 void runQ1(id<MTLDevice> device, id<MTLCommandQueue> queue);
 void runQ3(id<MTLDevice> device, id<MTLCommandQueue> queue);
+void runQ4(id<MTLDevice> device, id<MTLCommandQueue> queue);
 void runQ5(id<MTLDevice> device, id<MTLCommandQueue> queue);
 void runQ6(id<MTLDevice> device, id<MTLCommandQueue> queue);
 void runQ9(id<MTLDevice> device, id<MTLCommandQueue> queue);
@@ -18,6 +19,7 @@ static void showHelp() {
     printf("  micro         - Micro-benchmarks (selection, aggregation, join)\n");
     printf("  q1            - TPC-H Q1  (Pricing Summary)\n");
     printf("  q3            - TPC-H Q3  (Shipping Priority)      [3-way join]\n");
+    printf("  q4            - TPC-H Q4  (Order Priority Checking) [semi-join]\n");
     printf("  q5            - TPC-H Q5  (Local Supplier Volume)  [5-way join]\n");
     printf("  q6            - TPC-H Q6  (Forecasting Revenue Change)\n");
     printf("  q9            - TPC-H Q9  (Product Type Profit)    [6-table join]\n");
@@ -68,6 +70,8 @@ int main(int argc, const char* argv[]) {
             runQ1(device, commandQueue);
         if (query == "q3" || query == "all")
             runQ3(device, commandQueue);
+        if (query == "q4" || query == "all")
+            runQ4(device, commandQueue);
         if (query == "q5" || query == "all")
             runQ5(device, commandQueue);
         if (query == "q6" || query == "all")

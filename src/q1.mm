@@ -12,14 +12,7 @@
 // WHERE l_shipdate <= DATE '1998-12-01' - INTERVAL '90' DAY  (= 1998-09-02)
 // GROUP BY l_returnflag, l_linestatus
 // ORDER BY l_returnflag, l_linestatus;
-//
-// Group encoding (rf_idx * 2 + ls_idx):
-//   (A,F)=0  (A,O)=1  (N,F)=2  (N,O)=3  (R,F)=4  (R,O)=5
-//
-// Strategy: scatter (MPSGraphScatterModeAdd) causes extreme atomic contention
-// when 6M threads write into only 6 bins. Instead, use one reductionSum per
-// group per metric — 6 groups × 6 metrics = 36 parallel reductions, each O(log N).
-// The 6 scalar [1] outputs per metric are concatenated into a single [6] tensor.
+
 
 void runQ1(id<MTLDevice> device, id<MTLCommandQueue> queue) {
     printf("\n--- TPC-H Q1: Pricing Summary Report ---\n");
