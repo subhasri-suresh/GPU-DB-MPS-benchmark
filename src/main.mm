@@ -7,6 +7,7 @@ void runQ3(id<MTLDevice> device, id<MTLCommandQueue> queue);
 void runQ4(id<MTLDevice> device, id<MTLCommandQueue> queue);
 void runQ5(id<MTLDevice> device, id<MTLCommandQueue> queue);
 void runQ6(id<MTLDevice> device, id<MTLCommandQueue> queue);
+void runQ7(id<MTLDevice> device, id<MTLCommandQueue> queue);
 void runQ9(id<MTLDevice> device, id<MTLCommandQueue> queue);
 void runQ12(id<MTLDevice> device, id<MTLCommandQueue> queue);
 void runQ14(id<MTLDevice> device, id<MTLCommandQueue> queue);
@@ -22,6 +23,7 @@ static void showHelp() {
     printf("  q4            - TPC-H Q4  (Order Priority Checking) [semi-join]\n");
     printf("  q5            - TPC-H Q5  (Local Supplier Volume)  [5-way join]\n");
     printf("  q6            - TPC-H Q6  (Forecasting Revenue Change)\n");
+    printf("  q7            - TPC-H Q7  (Volume Shipping)        [4-way join]\n");
     printf("  q9            - TPC-H Q9  (Product Type Profit)    [6-table join]\n");
     printf("  q12           - TPC-H Q12 (Shipping Modes)\n");
     printf("  q14           - TPC-H Q14 (Promotion Effect)\n");
@@ -76,6 +78,8 @@ int main(int argc, const char* argv[]) {
             runQ5(device, commandQueue);
         if (query == "q6" || query == "all")
             runQ6(device, commandQueue);
+        if (query == "q7" || query == "all")
+            runQ7(device, commandQueue);
         if (query == "q9" || query == "all")
             runQ9(device, commandQueue);
         if (query == "q12" || query == "all")
