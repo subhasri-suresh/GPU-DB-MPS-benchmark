@@ -8,7 +8,12 @@ void runQ4(id<MTLDevice> device, id<MTLCommandQueue> queue);
 void runQ5(id<MTLDevice> device, id<MTLCommandQueue> queue);
 void runQ6(id<MTLDevice> device, id<MTLCommandQueue> queue);
 void runQ7(id<MTLDevice> device, id<MTLCommandQueue> queue);
+void runQ8(id<MTLDevice> device, id<MTLCommandQueue> queue);
 void runQ9(id<MTLDevice> device, id<MTLCommandQueue> queue);
+void runQ10(id<MTLDevice> device, id<MTLCommandQueue> queue);
+void runQ11(id<MTLDevice> device, id<MTLCommandQueue> queue);
+void runQ13(id<MTLDevice> device, id<MTLCommandQueue> queue);
+void runQ15(id<MTLDevice> device, id<MTLCommandQueue> queue);
 void runQ12(id<MTLDevice> device, id<MTLCommandQueue> queue);
 void runQ14(id<MTLDevice> device, id<MTLCommandQueue> queue);
 
@@ -24,7 +29,12 @@ static void showHelp() {
     printf("  q5            - TPC-H Q5  (Local Supplier Volume)  [5-way join]\n");
     printf("  q6            - TPC-H Q6  (Forecasting Revenue Change)\n");
     printf("  q7            - TPC-H Q7  (Volume Shipping)        [4-way join]\n");
+    printf("  q8            - TPC-H Q8  (National Market Share)  [6-way join]\n");
     printf("  q9            - TPC-H Q9  (Product Type Profit)    [6-table join]\n");
+    printf("  q10           - TPC-H Q10 (Returned Item Reporting) [4-way join]\n");
+    printf("  q11           - TPC-H Q11 (Important Stock Identification)\n");
+    printf("  q13           - TPC-H Q13 (Customer Distribution)\n");
+    printf("  q15           - TPC-H Q15 (Top Supplier)\n");
     printf("  q12           - TPC-H Q12 (Shipping Modes)\n");
     printf("  q14           - TPC-H Q14 (Promotion Effect)\n");
     printf("  help          - Show this help message\n\n");
@@ -80,8 +90,18 @@ int main(int argc, const char* argv[]) {
             runQ6(device, commandQueue);
         if (query == "q7" || query == "all")
             runQ7(device, commandQueue);
+        if (query == "q8" || query == "all")
+            runQ8(device, commandQueue);
         if (query == "q9" || query == "all")
             runQ9(device, commandQueue);
+        if (query == "q10" || query == "all")
+            runQ10(device, commandQueue);
+        if (query == "q11" || query == "all")
+            runQ11(device, commandQueue);
+        if (query == "q13" || query == "all")
+            runQ13(device, commandQueue);
+        if (query == "q15" || query == "all")
+            runQ15(device, commandQueue);
         if (query == "q12" || query == "all")
             runQ12(device, commandQueue);
         if (query == "q14" || query == "all")

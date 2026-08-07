@@ -14,11 +14,14 @@
 //   AND p_name LIKE '%green%'
 // GROUP BY n_name, o_year ORDER BY n_name, o_year DESC
 //
-// Hybrid strategy:
+// Strategy (fully GPU except the three small dense-array builds below):
 //   CPU build: part bitmap (contains 'green'), supplier-nation map, orders-year map.
-//   CPU pre-join: for each lineitem row look up ps_supplycost via (partkey,suppkey) hash map.
-//   MPSGraph:  gather part/supp/order lookups, compute profit per row, scatter into
-//              (nation × year) grid of 25×10 = 250 buckets.
+//   MPSGraph:  gather part/supp/order lookups; resolve the composite (partkey,suppkey)
+//              -> supplycost join on GPU by exploiting TPC-H's fixed PARTSUPP layout
+//              (exactly 4 contiguous rows per part, sorted by partkey): gather the 4
+//              candidate rows at base=(partkey-1)*4 and mask-select the one whose
+//              suppkey matches. Compute profit per row, scatter into (nation × year)
+//              grid of 25×10 = 250 buckets.
 //   CPU post:  decode buckets, sort by (n_name ASC, year DESC), print.
 
 static constexpr int MAX_YEARS = 10;
@@ -45,14 +48,16 @@ void runQ9(id<MTLDevice> device, id<MTLCommandQueue> queue) {
     auto& s_suppkey   = sup.suppkey;
     auto& s_nationkey = sup.nationkey;
 
+    // ps_partkey is not loaded: it's implicit from row position. TPC-H guarantees
+    // partsupp has exactly 4 contiguous rows per part, sorted by partkey, so row
+    // (partkey-1)*4 + j (j=0..3) is that part's j-th supplier entry.
     auto psCols = loadColumnsMulti(g_dataset_path + "partsupp.tbl", {
-        {0, ColType::INT  },   // ps_partkey
         {1, ColType::INT  },   // ps_suppkey
         {3, ColType::FLOAT},   // ps_supplycost
     });
-    auto& ps_partkey    = psCols.ints(0);
     auto& ps_suppkey    = psCols.ints(1);
     auto& ps_supplycost = psCols.floats(3);
+    size_t psN = ps_suppkey.size();
 
     auto oCols = loadColumnsMulti(g_dataset_path + "orders.tbl", {
         {0, ColType::INT },   // o_orderkey
@@ -83,7 +88,7 @@ void runQ9(id<MTLDevice> device, id<MTLCommandQueue> queue) {
     auto t1 = std::chrono::high_resolution_clock::now();
     double parseMs = std::chrono::duration<double, std::milli>(t1 - t0).count();
     printf("  Part: %zu  Supplier: %zu  PartSupp: %zu  Orders: %zu  Lineitem: %zu  (parse: %.1f ms)\n",
-           p_partkey.size(), s_suppkey.size(), ps_partkey.size(), o_orderkey.size(), N, parseMs);
+           p_partkey.size(), s_suppkey.size(), psN, o_orderkey.size(), N, parseMs);
 
     // ----------------------------------------------------------------
     // Step 2: CPU — part bitmap (1.0 if name contains 'green', else 0.0)
@@ -117,24 +122,7 @@ void runQ9(id<MTLDevice> device, id<MTLCommandQueue> queue) {
         orders_year_map[(size_t)o_orderkey[i]] = o_orderdate[i] / 10000;
 
     // ----------------------------------------------------------------
-    // Step 5: CPU — pre-join partsupp: lineitem[i] → supplycost
-    //   Uses (partkey<<32)|suppkey hash map.  -1.0f = not found (invalid).
-    // ----------------------------------------------------------------
-    std::unordered_map<uint64_t, float> ps_ht;
-    ps_ht.reserve(ps_partkey.size() * 2);
-    for (size_t i = 0; i < ps_partkey.size(); i++) {
-        uint64_t key = ((uint64_t)(uint32_t)ps_partkey[i] << 32) | (uint32_t)ps_suppkey[i];
-        ps_ht[key] = ps_supplycost[i];
-    }
-    std::vector<float> supplycost_pj(N, -1.0f);
-    for (size_t i = 0; i < N; i++) {
-        uint64_t key = ((uint64_t)(uint32_t)l_partkey[i] << 32) | (uint32_t)l_suppkey[i];
-        auto it = ps_ht.find(key);
-        if (it != ps_ht.end()) supplycost_pj[i] = it->second;
-    }
-
-    // ----------------------------------------------------------------
-    // Step 6: Build MPSGraph
+    // Step 5: Build MPSGraph
     // ----------------------------------------------------------------
     MPSGraph* graph = [[MPSGraph alloc] init];
 
@@ -156,8 +144,10 @@ void runQ9(id<MTLDevice> device, id<MTLCommandQueue> queue) {
                                                       dataType:MPSDataTypeFloat32 name:@"extprice"];
     MPSGraphTensor* tDiscount    = [graph placeholderWithShape:@[@(N)]
                                                       dataType:MPSDataTypeFloat32 name:@"discount"];
-    MPSGraphTensor* tSupplycost  = [graph placeholderWithShape:@[@(N)]
-                                                      dataType:MPSDataTypeFloat32 name:@"supplycost"];
+    MPSGraphTensor* tPsSuppkey   = [graph placeholderWithShape:@[@(psN)]
+                                                      dataType:MPSDataTypeInt32   name:@"ps_suppkey"];
+    MPSGraphTensor* tPsCost      = [graph placeholderWithShape:@[@(psN)]
+                                                      dataType:MPSDataTypeFloat32 name:@"ps_supplycost"];
 
     // Gather lookups per lineitem row
     MPSGraphTensor* partMatch  = [graph gatherWithUpdatesTensor:tPartGreen
@@ -169,6 +159,32 @@ void runQ9(id<MTLDevice> device, id<MTLCommandQueue> queue) {
     MPSGraphTensor* orderYear  = [graph gatherWithUpdatesTensor:tOrdYearMap
                                                   indicesTensor:tLOrderkey
                                                            axis:0 batchDimensions:0 name:@"ord_year"];
+
+    // Composite-key (partkey,suppkey) join, resolved entirely on GPU: TPC-H guarantees
+    // partsupp has exactly 4 contiguous rows per part, sorted by partkey, so row
+    // (partkey-1)*4 + j (j=0..3) holds that part's j-th supplier entry. Gather the 4
+    // candidates, compare suppkey, and mask-select the one that matches.
+    MPSGraphTensor* oneI  = [graph constantWithScalar:1 dataType:MPSDataTypeInt32];
+    MPSGraphTensor* fourI = [graph constantWithScalar:4 dataType:MPSDataTypeInt32];
+    MPSGraphTensor* psBase = [graph multiplicationWithPrimaryTensor:
+                                  [graph subtractionWithPrimaryTensor:tLPartkey secondaryTensor:oneI name:nil]
+                              secondaryTensor:fourI name:@"ps_base"];
+
+    MPSGraphTensor* supplycost = [graph constantWithScalar:0.0 shape:@[@(N)] dataType:MPSDataTypeFloat32];
+    for (int j = 0; j < 4; j++) {
+        MPSGraphTensor* jI  = [graph constantWithScalar:j dataType:MPSDataTypeInt32];
+        MPSGraphTensor* idx = [graph additionWithPrimaryTensor:psBase secondaryTensor:jI name:nil];
+
+        MPSGraphTensor* candSuppkey = [graph gatherWithUpdatesTensor:tPsSuppkey indicesTensor:idx
+                                                                  axis:0 batchDimensions:0 name:nil];
+        MPSGraphTensor* candCost    = [graph gatherWithUpdatesTensor:tPsCost    indicesTensor:idx
+                                                                  axis:0 batchDimensions:0 name:nil];
+        MPSGraphTensor* matchF = [graph castTensor:
+                                      [graph equalWithPrimaryTensor:candSuppkey secondaryTensor:tLSuppkey name:nil]
+                                  toType:MPSDataTypeFloat32 name:nil];
+        MPSGraphTensor* term = [graph multiplicationWithPrimaryTensor:matchF secondaryTensor:candCost name:nil];
+        supplycost = [graph additionWithPrimaryTensor:supplycost secondaryTensor:term name:nil];
+    }
 
     // Validity conditions
     MPSGraphTensor* zeroI       = [graph constantWithScalar:0   dataType:MPSDataTypeInt32];
@@ -182,9 +198,11 @@ void runQ9(id<MTLDevice> device, id<MTLCommandQueue> queue) {
                                                                secondaryTensor:zeroI name:nil];
     MPSGraphTensor* validYear   = [graph greaterThanOrEqualToWithPrimaryTensor:orderYear
                                                                secondaryTensor:zeroI name:nil];
-    // valid partsupp pre-join: supplycost >= 0 (TPC-H supplycost is always > 0)
-    MPSGraphTensor* validPS     = [graph greaterThanOrEqualToWithPrimaryTensor:tSupplycost
-                                                               secondaryTensor:zeroF name:nil];
+    // valid partsupp join: supplycost > 0 (TPC-H supplycost is always > 0; a row with
+    // no matching (partkey,suppkey) among the 4 candidates leaves the mask-selected
+    // sum at exactly 0.0)
+    MPSGraphTensor* validPS     = [graph greaterThanWithPrimaryTensor:supplycost
+                                                       secondaryTensor:zeroF name:nil];
 
     // Combined mask (all four conditions) → float
     MPSGraphTensor* maskF = [graph castTensor:
@@ -202,7 +220,7 @@ void runQ9(id<MTLDevice> device, id<MTLCommandQueue> queue) {
                                     secondaryTensor:[graph subtractionWithPrimaryTensor:oneF
                                                                         secondaryTensor:tDiscount name:nil]
                                     name:nil];
-    MPSGraphTensor* cost     = [graph multiplicationWithPrimaryTensor:tSupplycost
+    MPSGraphTensor* cost     = [graph multiplicationWithPrimaryTensor:supplycost
                                     secondaryTensor:tQty name:nil];
     MPSGraphTensor* profit   = [graph multiplicationWithPrimaryTensor:
                                     [graph subtractionWithPrimaryTensor:revenue secondaryTensor:cost name:nil]
@@ -233,7 +251,7 @@ void runQ9(id<MTLDevice> device, id<MTLCommandQueue> queue) {
                                                          name:@"group_profit"];
 
     // ----------------------------------------------------------------
-    // Step 7: Feeds + output buffer
+    // Step 6: Feeds + output buffer
     // ----------------------------------------------------------------
     MPSGraphTensorData* pgTD   = columnTensor(device, part_green.data(),
                                               (size_t)(max_partkey + 1), MPSDataTypeFloat32);
@@ -247,13 +265,14 @@ void runQ9(id<MTLDevice> device, id<MTLCommandQueue> queue) {
     MPSGraphTensorData* qTD    = columnTensor(device, (void*)l_qty.data(),       N, MPSDataTypeFloat32);
     MPSGraphTensorData* epTD   = columnTensor(device, (void*)l_extprice.data(),  N, MPSDataTypeFloat32);
     MPSGraphTensorData* diTD   = columnTensor(device, (void*)l_discount.data(),  N, MPSDataTypeFloat32);
-    MPSGraphTensorData* scTD   = columnTensor(device, supplycost_pj.data(),      N, MPSDataTypeFloat32);
+    MPSGraphTensorData* pskTD  = columnTensor(device, (void*)ps_suppkey.data(),    psN, MPSDataTypeInt32);
+    MPSGraphTensorData* pscTD  = columnTensor(device, (void*)ps_supplycost.data(), psN, MPSDataTypeFloat32);
 
     NSDictionary* feeds = @{
         tPartGreen:  pgTD, tSuppNatMap: snTD, tOrdYearMap: oyTD,
         tLPartkey:   pkTD, tLSuppkey:   skTD, tLOrderkey:  okTD,
         tQty:        qTD,  tExtprice:   epTD, tDiscount:   diTD,
-        tSupplycost: scTD,
+        tPsSuppkey:  pskTD, tPsCost:    pscTD,
     };
 
     id<MTLBuffer> profitBuf = allocSharedBuffer(device, NUM_BUCKETS * sizeof(float));
@@ -263,12 +282,12 @@ void runQ9(id<MTLDevice> device, id<MTLCommandQueue> queue) {
     results[groupProfit] = profitTD;
 
     // ----------------------------------------------------------------
-    // Step 8: 2 warmup + 1 measured run
+    // Step 7: 2 warmup + 1 measured run
     // ----------------------------------------------------------------
     double gpuMs = runQueryWarmedUp(graph, feeds, nil, queue, results);
 
     // ----------------------------------------------------------------
-    // Step 9: CPU post — decode buckets, sort, print
+    // Step 8: CPU post — decode buckets, sort, print
     // ----------------------------------------------------------------
     auto tp0 = std::chrono::high_resolution_clock::now();
     float* gp = (float*)[profitBuf contents];
