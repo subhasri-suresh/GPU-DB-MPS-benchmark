@@ -11,7 +11,8 @@ metal_df = pd.read_csv(metal_csv)
 mps_df   = pd.read_csv(mps_csv)
 
 # ── Filter: latest run on Apple M1, only queries present in both ──────────────
-QUERIES = ["Q1", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q10", "Q11", "Q12", "Q13", "Q14", "Q15"]
+QUERIES = ["Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q10",
+           "Q11", "Q12", "Q13", "Q14", "Q15", "Q16", "Q17", "Q18", "Q19", "Q20", "Q21", "Q22"]
 SFS     = ["SF-1", "SF-10"]
 
 metal_m1 = metal_df[metal_df["gpu_name"] == "Apple M1"]
@@ -60,7 +61,7 @@ print("\nTable saved → results/comparison_table.txt")
 print("Table saved → results/comparison_table.csv")
 
 # ── Plot ──────────────────────────────────────────────────────────────────────
-fig, axes = plt.subplots(1, 2, figsize=(13, 5), sharey=False)
+fig, axes = plt.subplots(1, 2, figsize=(20, 6), sharey=False)
 fig.suptitle("Plain Metal vs MPSGraph — TPC-H on Apple M1", fontsize=14, fontweight="bold")
 
 colors = {"Metal": "#2196F3", "MPS": "#FF5722"}

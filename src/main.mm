@@ -3,6 +3,7 @@
 
 void runMicrobenchmarks(id<MTLDevice> device, id<MTLCommandQueue> queue);
 void runQ1(id<MTLDevice> device, id<MTLCommandQueue> queue);
+void runQ2(id<MTLDevice> device, id<MTLCommandQueue> queue);
 void runQ3(id<MTLDevice> device, id<MTLCommandQueue> queue);
 void runQ4(id<MTLDevice> device, id<MTLCommandQueue> queue);
 void runQ5(id<MTLDevice> device, id<MTLCommandQueue> queue);
@@ -16,6 +17,13 @@ void runQ13(id<MTLDevice> device, id<MTLCommandQueue> queue);
 void runQ15(id<MTLDevice> device, id<MTLCommandQueue> queue);
 void runQ12(id<MTLDevice> device, id<MTLCommandQueue> queue);
 void runQ14(id<MTLDevice> device, id<MTLCommandQueue> queue);
+void runQ16(id<MTLDevice> device, id<MTLCommandQueue> queue);
+void runQ17(id<MTLDevice> device, id<MTLCommandQueue> queue);
+void runQ18(id<MTLDevice> device, id<MTLCommandQueue> queue);
+void runQ19(id<MTLDevice> device, id<MTLCommandQueue> queue);
+void runQ20(id<MTLDevice> device, id<MTLCommandQueue> queue);
+void runQ21(id<MTLDevice> device, id<MTLCommandQueue> queue);
+void runQ22(id<MTLDevice> device, id<MTLCommandQueue> queue);
 
 static void showHelp() {
     printf("GPU Database MPS Benchmark\n");
@@ -24,6 +32,7 @@ static void showHelp() {
     printf("  all           - Run all benchmarks (default)\n");
     printf("  micro         - Micro-benchmarks (selection, aggregation, join)\n");
     printf("  q1            - TPC-H Q1  (Pricing Summary)\n");
+    printf("  q2            - TPC-H Q2  (Minimum Cost Supplier)  [correlated subquery]\n");
     printf("  q3            - TPC-H Q3  (Shipping Priority)      [3-way join]\n");
     printf("  q4            - TPC-H Q4  (Order Priority Checking) [semi-join]\n");
     printf("  q5            - TPC-H Q5  (Local Supplier Volume)  [5-way join]\n");
@@ -37,6 +46,13 @@ static void showHelp() {
     printf("  q15           - TPC-H Q15 (Top Supplier)\n");
     printf("  q12           - TPC-H Q12 (Shipping Modes)\n");
     printf("  q14           - TPC-H Q14 (Promotion Effect)\n");
+    printf("  q16           - TPC-H Q16 (Parts/Supplier Relationship) [distinct count]\n");
+    printf("  q17           - TPC-H Q17 (Small-Quantity-Order Revenue)\n");
+    printf("  q18           - TPC-H Q18 (Large Volume Customer)\n");
+    printf("  q19           - TPC-H Q19 (Discounted Revenue)\n");
+    printf("  q20           - TPC-H Q20 (Potential Part Promotion) [semi-join]\n");
+    printf("  q21           - TPC-H Q21 (Suppliers Who Kept Orders Waiting) [anti-join]\n");
+    printf("  q22           - TPC-H Q22 (Global Sales Opportunity)\n");
     printf("  help          - Show this help message\n\n");
     printf("Scale Factors:\n");
     printf("  sf1           - TPC-H SF-1  (~6M lineitem rows)\n");
@@ -80,6 +96,8 @@ int main(int argc, const char* argv[]) {
             runMicrobenchmarks(device, commandQueue);
         if (query == "q1" || query == "all")
             runQ1(device, commandQueue);
+        if (query == "q2" || query == "all")
+            runQ2(device, commandQueue);
         if (query == "q3" || query == "all")
             runQ3(device, commandQueue);
         if (query == "q4" || query == "all")
@@ -106,6 +124,20 @@ int main(int argc, const char* argv[]) {
             runQ12(device, commandQueue);
         if (query == "q14" || query == "all")
             runQ14(device, commandQueue);
+        if (query == "q16" || query == "all")
+            runQ16(device, commandQueue);
+        if (query == "q17" || query == "all")
+            runQ17(device, commandQueue);
+        if (query == "q18" || query == "all")
+            runQ18(device, commandQueue);
+        if (query == "q19" || query == "all")
+            runQ19(device, commandQueue);
+        if (query == "q20" || query == "all")
+            runQ20(device, commandQueue);
+        if (query == "q21" || query == "all")
+            runQ21(device, commandQueue);
+        if (query == "q22" || query == "all")
+            runQ22(device, commandQueue);
     }
     return 0;
 }
