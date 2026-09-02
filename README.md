@@ -60,7 +60,3 @@ compare.py   joins both result CSVs, writes the comparison table and chart
 - **Timing**: `gpu_exec_ms` covers command-buffer commit to completion; CPU-side work is logged separately as `cpu_post_ms`
 - **Metal baseline**: [nd-tung/GPUDBMetalBenchmark](https://github.com/nd-tung/GPUDBMetalBenchmark) at commit `f0069d5`, used unmodified. Run it against the same `data/` directories to populate `results/metal_results.csv`.
 
-## About
-
-Master's thesis, M.Sc. International Software Systems Science, University of Bamberg.
-Supervisor: Prof. Dr. Maximilian E. Schüle, Chair of Data Engineering.
